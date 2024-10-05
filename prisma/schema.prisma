@@ -1,0 +1,184 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "fullTextSearch"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ################################################################################################
+// Models required by Lucia 
+
+model User {
+  id String @id
+
+  // Our custom defined fields
+  username     String  @unique
+  displayName  String
+  email        String? @unique
+  passwordHash String?
+  googleId     String? @unique
+  avatarUrl    String?
+  bio          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions              Session[]
+  posts                 Post[]
+  following             Follow[]       @relation("Follower")
+  followers             Follow[]       @relation("Followed")
+  likes                 Like[]
+  bookmarks             Bookmark[]
+  comments              Comment[]
+  receivedNotifications Notification[] @relation("Recipient")
+  issuedNotifications   Notification[] @relation("Issuer")
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ################################################################################################
+// Models required for our app
+
+// A follower relationship between users
+model Follow {
+  id         String @id @default(cuid())
+  followerId String
+  followedId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed User @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followedId])
+  @@map("follows")
+}
+
+// A post created by a user
+model Post {
+  id      String @id @default(cuid())
+  userId  String
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachments   Media[]
+  likes         Like[]
+  bookmarks     Bookmark[]
+  comments      Comment[]
+  notifications Notification[]
+
+  @@map("posts")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// A media attachment to a post
+model Media {
+  id     String    @id @default(cuid())
+  postId String?
+  url    String
+  type   MediaType
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@map("media")
+}
+
+// A comment on a post
+model Comment {
+  id      String @id @default(cuid())
+  userId  String
+  postId  String
+  content String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// A like on a post
+model Like {
+  id     String @id @default(cuid())
+  userId String
+  postId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("likes")
+}
+
+// A bookmark on a post
+model Bookmark {
+  id     String @id @default(cuid())
+  userId String
+  postId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("bookmarks")
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+}
+
+// A notification event
+model Notification {
+  id          String           @id @default(cuid())
+  issuerId    String
+  recipientId String
+  postId      String?
+  type        NotificationType
+  read        Boolean          @default(false)
+
+  issuer    User  @relation("Issuer", fields: [issuerId], references: [id], onDelete: Cascade)
+  recipient User  @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  post      Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+}

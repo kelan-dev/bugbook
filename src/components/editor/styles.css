@@ -1,0 +1,13 @@
+/* Displays the placeholder text in the Tiptap editor */
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: theme("colors.muted.foreground");
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Removes the outline from the Tiptap editor */
+.ProseMirror:focus {
+  outline: none;
+}
